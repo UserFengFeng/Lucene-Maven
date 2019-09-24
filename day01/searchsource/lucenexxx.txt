@@ -1,0 +1,2220 @@
+import React, { PureComponent } from 'react';
+import { connect } from 'dva';
+import moment from 'moment';
+// import queryString from 'querystring';
+import classNames from 'classnames';
+// import Slick from 'react-slick';
+// import 'slick-carousel/slick/slick.css';
+// import 'slick-carousel/slick/slick-theme.css';
+import _ from 'lodash';
+import {
+  Stage,
+  Layer,
+  Image as KonvaImage,
+  Text,
+  Circle,
+  Shape,
+  Line,
+  Arrow,
+  Group,
+} from 'react-konva';
+
+import {
+  Card,
+  Form,
+  Button,
+  Modal,
+  Icon,
+  Select,
+  DatePicker,
+  Row,
+  Col,
+  Pagination,
+  TreeSelect,
+  Radio,
+  Switch,
+  message,
+  Tooltip,
+  Tag,
+  Slider,
+  Spin,
+  Empty,
+} from 'antd';
+import {
+  Map,
+  Marker,
+  Base,
+  Label,
+  Navigation,
+  Polygon,
+  Polyline,
+  //  Constants
+} from 'rc-bmap';
+import Debounce from 'lodash-decorators/debounce';
+import Bind from 'lodash-decorators/bind';
+import Selection from '@simonwep/selection-js';
+import Zmage from 'react-zmage';
+
+import PageHeaderWrapper from '@/components/PageHeaderWrapper';
+import RightClickMenu from '@/components/RightClickMenu';
+import GeoUtils from '@/components/_utils/GeoUtils';
+import Portal from '@/components/_utils/Portal';
+import UploadAndSelectPeople from '@/components/UploadAndSelectPeople';
+
+import styles from './Fusion.less';
+
+const bodyImage = '/body.jpg';
+const faceImage = '/face.jpg';
+const videoImage = '/video.png';
+const indoorImage = '/indoor.png';
+
+const { Option } = Select;
+const { RangePicker } = DatePicker;
+const { Point, Size, Events, Path } = Base;
+const { Content } = Label;
+
+// 日期快捷选项
+const rangePickerRanges = {
+  今天: [moment().startOf('day'), moment().endOf('day')],
+  昨天: [
+    moment()
+      .startOf('day')
+      .subtract(1, 'day'),
+    moment()
+      .endOf('day')
+      .subtract(1, 'day'),
+  ],
+  近三天: [
+    moment()
+      .startOf('day')
+      .subtract(3, 'day'),
+    moment().endOf('day'),
+  ],
+  本周: [moment().startOf('week'), moment().endOf('week')],
+  本月: [moment().startOf('month'), moment().endOf('month')],
+};
+
+const COLOR = [
+  { id: 1, name: '白色', english: 'White' },
+  { id: 2, name: '粉色', english: 'Pink' },
+  { id: 3, name: '灰色', english: 'Grey' },
+  { id: 4, name: '红色', english: 'Red' },
+  { id: 5, name: '蓝色', english: 'Blue' },
+  { id: 6, name: '黄色', english: 'Yellow' },
+  { id: 7, name: '绿色', english: 'Green' },
+  { id: 8, name: '黑色', english: 'Black' },
+  { id: 9, name: '橙色', english: 'Orange' },
+  { id: 10, name: '青色', english: 'Cyan' },
+  { id: 12, name: '棕色', english: 'Brown' },
+  { id: 11, name: '未知', english: 'Unknown' },
+];
+
+const PATTERN = [
+  { id: 1, name: '条纹', english: 'Stripe' },
+  { id: 2, name: '图案', english: 'Pattern' },
+  { id: 3, name: '拼接', english: 'Splicing' },
+  { id: 4, name: '格子', english: 'Plaid' },
+  { id: 5, name: '未知', english: 'Unknown' },
+];
+
+const ATTRIBUTES = {
+  hair_color: ['9.1.', '发色', COLOR],
+  hat_color: ['9.2.', '帽子颜色', COLOR],
+  bag_color: ['9.3.', '包颜色', COLOR],
+  shoe_color: ['9.5.', '鞋子颜色', COLOR],
+  gender: [
+    '9.6.',
+    '人体性别',
+    [
+      { id: 1, name: '男', english: 'Male' },
+      { id: 2, name: '女', english: 'Female' },
+      { id: 3, name: '未知', english: 'Unknown' },
+    ],
+  ],
+  hair_style: [
+    '9.7.',
+    '发型',
+    [
+      { id: 1, name: '披肩', english: 'Shawl' },
+      { id: 2, name: '短发', english: 'ShortHair' },
+      { id: 3, name: '全秃', english: 'CompletelyBald' },
+      { id: 5, name: '马尾辫', english: 'Ponytail' },
+      { id: 6, name: '发髻', english: 'Bun' },
+      { id: 4, name: '未知', english: 'Unknown' },
+    ],
+  ],
+  accessory: [
+    '9.8.',
+    '附属物',
+    [
+      { id: 1, name: '相机', english: 'Camera' },
+      { id: 2, name: '伞', english: 'Umbrella' },
+      { id: 3, name: '水瓶', english: 'WaterBottle' },
+      { id: 4, name: '行李箱', english: 'Baggage' },
+      { id: 7, name: '领带', english: 'Tie' },
+      { id: 8, name: '口罩', english: 'Mask' },
+      { id: 9, name: '文件袋', english: 'FilePocket' },
+      { id: 10, name: '塑料袋', english: 'PlasticBag' },
+      { id: 6, name: '未知', english: 'Unknown' },
+    ],
+  ],
+  hat_style: [
+    '9.9.',
+    '帽子款式',
+    [
+      { id: 0, name: '大盖帽', english: 'BigLipCap' },
+      { id: 1, name: '渔夫帽', english: 'FishermanCap' },
+      { id: 2, name: '鸭舌帽', english: 'DuckTongueCap' },
+      { id: 3, name: '贝雷帽', english: 'Beret' },
+      { id: 4, name: '礼帽', english: 'Casquette' },
+      { id: 5, name: '棒球帽', english: 'BaseballCap' },
+      { id: 6, name: '遮阳帽', english: 'SunshadeCap' },
+      { id: 8, name: '卷檐帽', english: 'CoilingCap' },
+      { id: 9, name: '头盔', english: 'Helmet' },
+      { id: 7, name: '未知', english: 'Unknown' },
+    ],
+  ],
+  tops_style: [
+    '9.10.',
+    '上装款式',
+    [
+      { id: 1, name: '羽绒服', english: 'DownfilledCoat' },
+      { id: 2, name: '大衣', english: 'Coat' },
+      { id: 3, name: '衬衫', english: 'Shirt' },
+      { id: 4, name: '连衣裙', english: 'Dress' },
+      { id: 5, name: '西装', english: 'Suit' },
+      { id: 6, name: '冲锋衣', english: 'OutdoorJackets' },
+      { id: 7, name: '马夹', english: 'Vest' },
+      { id: 10, name: 'T恤', english: 'TShirt' },
+      { id: 11, name: '制服', english: 'Uniform' },
+      { id: 12, name: '牛仔衫', english: 'DenimShirt' },
+      { id: 8, name: '无', english: 'None' },
+      { id: 9, name: '未知', english: 'Unknown' },
+    ],
+  ],
+  tops_length: [
+    '9.11.',
+    '上装长度',
+    [
+      { id: 1, name: '长袖', english: 'LongSleeves' },
+      { id: 2, name: '半袖', english: 'SemiSleeve' },
+      { id: 3, name: '未知', english: 'Unknown' },
+    ],
+  ],
+  tops_color: ['9.12.', '上装颜色', COLOR],
+  tops_pattern: ['9.13.', '上装图案', PATTERN],
+  bottoms_style: [
+    '9.14.',
+    '下装款式',
+    [
+      { id: 1, name: '连衣裙', english: 'Dress' },
+      { id: 2, name: '打底裤', english: 'Underpants' },
+      { id: 3, name: '西裤', english: 'Trousers' },
+      { id: 4, name: '牛仔裤', english: 'Jeans' },
+      { id: 6, name: '裙子', english: 'Skirt' },
+      { id: 8, name: '休闲裤', english: 'CasualPants' },
+      { id: 7, name: '未知', english: 'Unknown' },
+    ],
+  ],
+  bottoms_length: [
+    '9.15.',
+    '下装长度',
+    [
+      { id: 1, name: '长裤', english: 'Trousers' },
+      { id: 2, name: '短裤', english: 'Shorts' },
+      { id: 3, name: '未知', english: 'Unknown' },
+    ],
+  ],
+  bottoms_color: ['9.16.', '下装颜色', COLOR],
+  bottoms_pattern: ['9.17.', '下装图案', PATTERN],
+  vest: [
+    '9.18.',
+    '马夹',
+    [{ id: 1, name: '有', english: 'Yes' }, { id: 2, name: '没有', english: 'None' }],
+  ],
+  glasses: [
+    '9.19.',
+    '眼镜',
+    [
+      { id: 1, name: '无', english: 'No' },
+      { id: 2, name: '普通眼镜', english: 'OrdinaryGlasses' },
+      { id: 3, name: '太阳镜', english: 'SunGlasses' },
+      { id: 4, name: '未知', english: 'Unknown' },
+    ],
+  ],
+  bag_style: [
+    '9.20.',
+    '包款式',
+    [
+      { id: 1, name: '挎包', english: 'Satchel' },
+      { id: 2, name: '背包', english: 'Backpack' },
+      { id: 3, name: '公文包', english: 'Briefcase' },
+      { id: 4, name: '信封包', english: 'EnvelopeBag' },
+      { id: 5, name: '未知', english: 'Unknown' },
+    ],
+  ],
+  shoe_style: [
+    '9.21.',
+    '鞋子款式',
+    [
+      { id: 1, name: '休闲鞋', english: 'CasualShoes' },
+      { id: 2, name: '皮鞋', english: 'LeatherShoes' },
+      { id: 3, name: '凉鞋', english: 'Sandals' },
+      { id: 4, name: '布鞋', english: 'ClothShoes' },
+      { id: 5, name: '未知', english: 'Unknown' },
+    ],
+  ],
+  age: [
+    '9.25.',
+    '年龄',
+    [
+      { id: 1, name: '幼儿', english: 'Child' },
+      { id: 2, name: '青少年', english: 'Teenager' },
+      { id: 3, name: '青年', english: 'Young' },
+      { id: 4, name: '中年', english: 'Middlescent' },
+      { id: 5, name: '老年', english: 'Oldster' },
+    ],
+  ],
+  face_gender: [
+    '9.10.1.',
+    '性别',
+    [{ id: 1, name: '男', english: 'Male' }, { id: 2, name: '女', english: 'Female' }],
+  ],
+  face_direction: [
+    '9.10.3.',
+    '正侧脸',
+    [{ id: 1, name: '正脸', english: 'Straight' }, { id: 2, name: '侧脸', english: 'Side' }],
+  ],
+  action: [
+    '1.',
+    '动作',
+    [
+      { id: 2, name: '摔倒', english: 'Fall' },
+      { id: 3, name: '下蹲', english: 'Squat' },
+      { id: 4, name: '向上看', english: 'LookUp' },
+      { id: '5.1', name: '向左看', english: 'LeftUpper' },
+      { id: '5.2', name: '向右看', english: 'RightUpper' },
+      { id: '5.3', name: '向前看', english: 'FrontUpper' },
+      { id: 6, name: '行走', english: 'Walk' },
+      { id: 7, name: '站立', english: 'Stand' },
+      { id: 8, name: '坐', english: 'Sit' },
+    ],
+  ],
+};
+
+const FaceContainer = props => {
+  const { src, area } = props;
+
+  return (
+    <div
+      className={styles.FaceContainer}
+      style={{
+        backgroundImage: `url(${src})`,
+        paddingBottom: `${area}%`,
+      }}
+    />
+  );
+};
+
+const polylinePointsColor = ['red', 'blue', 'green', 'yellow', 'violet', 'gray', 'pink', 'black'];
+
+@Form.create()
+class DisplayMode extends PureComponent {
+  constructor(props) {
+    super(props);
+    this.state = {};
+  }
+
+  componentDidMount() {
+    this.handleSearch();
+  }
+
+  componentDidUpdate(prevProps) {
+    const { isBodyMode } = this.props;
+    const { isBodyMode: oldIsBodyMode } = prevProps;
+    if (isBodyMode !== oldIsBodyMode) {
+      this.handleSearch();
+    }
+  }
+
+  handleFormReset = () => {
+    const { form } = this.props;
+    form.resetFields();
+    this.handleSearch();
+  };
+
+  handleSearch = () => {
+    const { form, searchValuesHandler } = this.props;
+    form.validateFields((err, values) => {
+      if (!err) {
+        searchValuesHandler(values);
+      }
+    });
+  };
+
+  getAttributeOption = key =>
+    ATTRIBUTES[key][2].map(item => (
+      <Option key={item.id} value={`${ATTRIBUTES[key][0]}${item.id}_${item.english}`}>
+        {item.name}
+      </Option>
+    ));
+
+  getColorOption = key =>
+    ATTRIBUTES[key][2].map(item => (
+      <Option key={item.id} value={`${ATTRIBUTES[key][0]}${item.id}_${item.english}`}>
+        <div className={styles.selectColor} style={{ backgroundColor: item.english }}>
+          &nbsp;
+        </div>
+        <span>{item.name}</span>
+      </Option>
+    ));
+
+  getFormItemDiv = (key, isColor) => {
+    const {
+      form: { getFieldDecorator },
+    } = this.props;
+    return (
+      <Form.Item label={ATTRIBUTES[key][1]}>
+        {getFieldDecorator(key, {})(
+          <Select allowClear>
+            {isColor ? this.getColorOption(key) : this.getAttributeOption(key)}
+          </Select>
+        )}
+      </Form.Item>
+    );
+  };
+
+  render() {
+    const { form, isBodyMode, isOpenAttributeHandler } = this.props;
+    const { getFieldDecorator } = form;
+    const formItemLayout = {
+      labelCol: { span: 8 },
+      wrapperCol: { span: 14 },
+    };
+
+    return (
+      <div>
+        <div style={{ marginBottom: 10 }}>
+          <Radio.Group
+            defaultValue
+            buttonStyle="solid"
+            style={{ marginRight: 10, marginTop: 4 }}
+            onChange={isOpenAttributeHandler}
+          >
+            <Radio.Button value>
+              <Icon type="user" />
+              人体为主
+            </Radio.Button>
+            <Radio.Button value={false}>
+              <Icon type="smile" />
+              人脸为主
+            </Radio.Button>
+          </Radio.Group>
+          <Form layout="inline" style={{ display: 'inline' }}>
+            <Form.Item label="时间段">
+              {getFieldDecorator('filterTime', {
+                rules: [{ required: true, message: '请输入时间段！' }],
+                initialValue: [moment().startOf('day'), moment().endOf('day')],
+              })(
+                <RangePicker
+                  ranges={rangePickerRanges}
+                  format="YYYY-MM-DD HH:mm:ss"
+                  showTime={{
+                    hideDisabledOptions: true,
+                    defaultValue: [moment('00:00:00', 'HH:mm:ss'), moment('23:59:59', 'HH:mm:ss')],
+                  }}
+                />
+              )}
+            </Form.Item>
+          </Form>
+          <Button style={{ marginLeft: 10 }} type="primary" onClick={this.handleSearch}>
+            查询
+          </Button>
+          <Button style={{ marginLeft: 10 }} onClick={this.handleFormReset}>
+            重置
+          </Button>
+        </div>
+
+        {!isBodyMode && (
+          <Form {...formItemLayout}>
+            <Row gutter={24}>
+              <Col span={4}>{this.getFormItemDiv('face_gender')}</Col>
+              <Col span={4}>{this.getFormItemDiv('face_direction')}</Col>
+            </Row>
+          </Form>
+        )}
+
+        {isBodyMode && (
+          <Form {...formItemLayout}>
+            <Row gutter={24}>
+              <Col span={4}>{this.getFormItemDiv('hair_color', true)}</Col>
+              <Col span={4}>{this.getFormItemDiv('hair_style')}</Col>
+              <Col span={4}>{this.getFormItemDiv('glasses')}</Col>
+              <Col span={4}>{this.getFormItemDiv('accessory')}</Col>
+              <Col span={4}>{this.getFormItemDiv('hat_color', true)}</Col>
+              <Col span={4}>{this.getFormItemDiv('hat_style')}</Col>
+              <Col span={4}>{this.getFormItemDiv('tops_color', true)}</Col>
+              <Col span={4}>{this.getFormItemDiv('tops_style')}</Col>
+              <Col span={4}>{this.getFormItemDiv('tops_length')}</Col>
+              <Col span={4}>{this.getFormItemDiv('tops_pattern')}</Col>
+              <Col span={4}>{this.getFormItemDiv('bag_color', true)}</Col>
+              <Col span={4}>{this.getFormItemDiv('bag_style')}</Col>
+              <Col span={4}>{this.getFormItemDiv('bottoms_color', true)}</Col>
+              <Col span={4}>{this.getFormItemDiv('bottoms_style')}</Col>
+              <Col span={4}>{this.getFormItemDiv('bottoms_length')}</Col>
+              <Col span={4}>{this.getFormItemDiv('bottoms_pattern')}</Col>
+              <Col span={4}>{this.getFormItemDiv('shoe_color', true)}</Col>
+              <Col span={4}>{this.getFormItemDiv('shoe_style')}</Col>
+              <Col span={4}>{this.getFormItemDiv('gender')}</Col>
+              <Col span={4}>{this.getFormItemDiv('age')}</Col>
+              <Col span={4}>{this.getFormItemDiv('action')}</Col>
+            </Row>
+          </Form>
+        )}
+      </div>
+    );
+  }
+}
+
+class URLImage extends React.Component {
+  state = {
+    image: null,
+  };
+
+  componentDidMount() {
+    this.loadImage();
+  }
+
+  componentDidUpdate(oldProps) {
+    const { src } = this.props;
+    if (oldProps.src !== src) {
+      this.loadImage();
+    }
+  }
+
+  componentWillUnmount() {
+    this.image.removeEventListener('load', this.handleLoad);
+  }
+
+  handleLoad = () => {
+    this.setState({
+      image: this.image,
+    });
+  };
+
+  loadImage() {
+    const { src } = this.props;
+    this.image = new window.Image();
+    this.image.src = src;
+    this.image.addEventListener('load', this.handleLoad);
+  }
+
+  render() {
+    const { x, y } = this.props;
+    const { image } = this.state;
+    return (
+      <KonvaImage
+        x={x}
+        y={y}
+        image={image}
+        ref={node => {
+          this.imageNode = node;
+        }}
+      />
+    );
+  }
+}
+
+/* eslint react/no-multi-comp:0 */
+/* eslint react/no-array-index-key: 0 */
+@connect(({ fusion, loading }) => ({
+  fusion,
+  loading: loading.effects['fusion/fetch'],
+  locusLoading: loading.effects['fusion/findTrack'],
+}))
+@Form.create()
+class Fusion extends PureComponent {
+  constructor(props) {
+    super(props);
+    this.state = {
+      pagination: {
+        total: 0,
+        current: 1,
+        pageSize: 20,
+      },
+      deptvideoData: [],
+      sourceVisible: false,
+      sourceImage: '',
+
+      // 条件过滤所用参数
+      videoId: [],
+      threshold: 0.8,
+      isFace: false,
+      imageVisible: false,
+      imgContext: {},
+      searchValues: {},
+
+      environmentVisible: false,
+      polyPoints: null,
+      indoorVisible: false,
+      indoorInfo: null,
+      stageWidth: 0,
+      stageHeight: 0,
+      imgScale: 1,
+
+      locusVisible: false,
+
+      imageFindtrack: [],
+      findtrackVisible: false,
+
+      isBodyMode: true,
+
+      indoorimgData: {},
+
+      locusImgVisible: false,
+      locusInfo: {},
+      imgDatas: [],
+      trackFaceImage: '',
+      fillPattern: {
+        offsetX: 0,
+        offsetY: 0,
+        scaleX: 0,
+        scaleY: 0,
+      },
+
+      detectionPicLoading: false,
+      detectionPic: [],
+
+      stage: null,
+    };
+    this.url = '/vaapi/';
+    this.startPoint = null;
+    this.menuItemMethod = {
+      download: () => {
+        const { imgContext } = this.state;
+        const aLink = document.createElement('a');
+        document.body.appendChild(aLink);
+        aLink.href = `/vaapi/${imgContext.sourceimg}`;
+        aLink.download = imgContext.sourceimg.slice(imgContext.sourceimg.lastIndexOf('/') + 1);
+        aLink.click();
+        document.body.removeChild(aLink);
+      },
+      open: () => {
+        const { imgContext } = this.state;
+        window.open(`/vaapi/${imgContext.sourceimg}`);
+      },
+      copy: () => {
+        if (window.getSelection) {
+          const selection = window.getSelection();
+          const range = document.createRange();
+          range.selectNode(this.imgNode);
+          selection.removeAllRanges();
+          selection.addRange(range);
+          document.execCommand('Copy');
+          selection.removeAllRanges();
+        }
+      },
+    };
+  }
+
+  componentWillMount() {
+    this.videoData();
+    // this.getData();
+  }
+
+  componentDidMount() {
+    const that = this;
+    window.addEventListener('resize', this.reSizeCanvas.bind(this), { passive: true });
+    Selection.create({
+      class: 'selection',
+      selectables: ['.box-item'],
+      boundaries: ['.box-wrap'],
+      onSelect({ target, originalEvent, selectedElements }) {
+        const selected = target.classList.contains('selected');
+        if (!originalEvent.ctrlKey && !originalEvent.metaKey) {
+          for (const el of selectedElements) {
+            el.classList.remove('selected');
+          }
+          this.clearSelection();
+        }
+        if (!selected) {
+          target.classList.add('selected');
+          this.keepSelection();
+        } else {
+          target.classList.remove('selected');
+          this.removeFromSelection(target);
+        }
+
+        const selectImages = [];
+
+        selectedElements.forEach(item => {
+          item.classList.forEach(clItem => {
+            if (clItem === 'selected') {
+              selectImages.push(parseInt(item.innerText.split('-')[0], 10));
+            }
+          });
+        });
+
+        that.setState({
+          imageFindtrack: [...selectImages],
+        });
+      },
+      onStart({ selectedElements, originalEvent }) {
+        if (!originalEvent.ctrlKey && !originalEvent.metaKey) {
+          for (const el of selectedElements) {
+            el.classList.remove('selected');
+          }
+          this.clearSelection();
+        }
+      },
+      onMove({ selectedElements, changedElements: { removed } }) {
+        for (const el of selectedElements) {
+          el.classList.add('selected');
+        }
+        for (const el of removed) {
+          el.classList.remove('selected');
+        }
+      },
+      onStop({ selectedElements }) {
+        this.keepSelection();
+
+        const selectImages = [];
+        selectedElements.forEach(item => {
+          item.classList.forEach(clItem => {
+            if (clItem === 'selected') {
+              selectImages.push(parseInt(item.innerText.split('-')[0], 10));
+            }
+          });
+        });
+        that.setState({
+          imageFindtrack: [...selectImages],
+        });
+      },
+    });
+  }
+
+  componentWillUnmount() {
+    window.removeEventListener('resize', this.reSizeCanvas.bind(this));
+    this.reSizeCanvas.cancel();
+  }
+
+  getAttrInfo = attribute => {
+    const keyValue = attribute.split('_')[0];
+    let keyNumber = keyValue.slice(0, keyValue.lastIndexOf('.') + 1);
+    let valueNumber = parseInt(keyValue.slice(keyValue.lastIndexOf('.') + 1), 10);
+    if (keyValue === '1.5.1' || keyValue === '1.5.2' || keyValue === '1.5.3') {
+      keyNumber = keyValue.slice(0, keyValue.indexOf('.') + 1);
+      valueNumber = keyValue.slice(keyValue.indexOf('.') + 1);
+    }
+    let category = '';
+    let value = '';
+    Object.keys(ATTRIBUTES).forEach(key => {
+      if (ATTRIBUTES[key][0] === keyNumber) {
+        [, category] = ATTRIBUTES[key];
+        value = _.find(ATTRIBUTES[key][2], { id: valueNumber }).name;
+      }
+    });
+    return `${category}: ${value}`;
+  };
+
+  getData = isFirst => {
+    const { dispatch } = this.props;
+    const {
+      pagination,
+      videoId,
+      isFace,
+      // imageFindtrack
+      imgDatas,
+      threshold,
+      isBodyMode,
+      searchValues,
+    } = this.state;
+
+    const that = this;
+    const paramString = {
+      current: isFirst ? 1 : pagination.current,
+      pageSize: pagination.pageSize,
+      uid: JSON.parse(sessionStorage.getItem('user')).uid,
+      video_id: null,
+      start_time: null,
+      end_time: null,
+      is_face: isFace,
+      img_datas: imgDatas,
+      peopleType: isBodyMode,
+      threshold,
+      attributes: [],
+    };
+
+    if (videoId) {
+      paramString.video_id = videoId;
+    }
+
+    if (searchValues.filterTime && searchValues.filterTime.length > 0) {
+      paramString.start_time = moment(searchValues.filterTime[0]).format('YYYY-MM-DD HH:mm:ss');
+      paramString.end_time = moment(searchValues.filterTime[1]).format('YYYY-MM-DD HH:mm:ss');
+    }
+
+    if (searchValues.hair_color) {
+      paramString.attributes.push(searchValues.hair_color);
+    }
+    if (searchValues.hat_color) {
+      paramString.attributes.push(searchValues.hat_color);
+    }
+    if (searchValues.bag_color) {
+      paramString.attributes.push(searchValues.bag_color);
+    }
+    if (searchValues.bag_color) {
+      paramString.attributes.push(searchValues.shoe_color);
+    }
+    if (searchValues.gender) {
+      paramString.attributes.push(searchValues.gender);
+    }
+    if (searchValues.hair_style) {
+      paramString.attributes.push(searchValues.hair_style);
+    }
+    if (searchValues.accessory) {
+      paramString.attributes.push(searchValues.accessory);
+    }
+    if (searchValues.hat_style) {
+      paramString.attributes.push(searchValues.hat_style);
+    }
+    if (searchValues.tops_style) {
+      paramString.attributes.push(searchValues.tops_style);
+    }
+    if (searchValues.tops_length) {
+      paramString.attributes.push(searchValues.tops_length);
+    }
+    if (searchValues.tops_color) {
+      paramString.attributes.push(searchValues.tops_color);
+    }
+    if (searchValues.tops_pattern) {
+      paramString.attributes.push(searchValues.tops_pattern);
+    }
+    if (searchValues.bottoms_style) {
+      paramString.attributes.push(searchValues.bottoms_style);
+    }
+    if (searchValues.bottoms_length) {
+      paramString.attributes.push(searchValues.bottoms_length);
+    }
+    if (searchValues.bottoms_color) {
+      paramString.attributes.push(searchValues.bottoms_color);
+    }
+    if (searchValues.bottoms_pattern) {
+      paramString.attributes.push(searchValues.bottoms_pattern);
+    }
+    if (searchValues.bag_style) {
+      paramString.attributes.push(searchValues.bag_style);
+    }
+    if (searchValues.shoe_style) {
+      paramString.attributes.push(searchValues.shoe_style);
+    }
+    if (searchValues.age) {
+      paramString.attributes.push(searchValues.age);
+    }
+    if (searchValues.action) {
+      paramString.attributes.push(searchValues.action);
+    }
+
+    if (searchValues.face_gender) {
+      paramString.attributes.push(searchValues.face_gender);
+    }
+    if (searchValues.face_direction) {
+      paramString.attributes.push(searchValues.face_direction);
+    }
+
+    dispatch({
+      type: 'fusion/fetch',
+      payload: {
+        ...paramString,
+      },
+      callback(res) {
+        if (res.status === 'success') {
+          const paginations = {
+            total: res.pagination.total,
+            current: res.pagination.pageNum,
+            pageSize: res.pagination.pageSize,
+          };
+          that.setState(
+            {
+              pagination: paginations,
+              imageFindtrack: [],
+            },
+            () => {
+              const selectDom = document.getElementsByClassName('box-item');
+              const newSelectArr = [];
+              for (let i = 0; i < selectDom.length; i += 1) {
+                newSelectArr.push(selectDom[i]);
+              }
+
+              newSelectArr.forEach(item => {
+                item.classList.remove('selected');
+              });
+            }
+          );
+        } else {
+          message.error(res.exception);
+        }
+      },
+    });
+  };
+
+  paginationSizeChange = (current, size) => {
+    const { pagination } = this.state;
+    pagination.pageSize = size;
+
+    this.setState(
+      {
+        pagination,
+      },
+      this.getData(true)
+    );
+  };
+
+  handleCancel = () => this.setState({ sourceVisible: false });
+
+  showImageHandler = item => {
+    const image = new Image();
+    image.src = this.url + item.sourceimg;
+
+    image.onload = () => {
+      this.setState({
+        imgContext: {
+          ...item,
+          sourceImgSize: `${image.width},${image.height}`,
+        },
+        imageVisible: true,
+      });
+    };
+  };
+
+  hideImageHandler = () => {
+    this.setState({ imageVisible: false, imgContext: {} }, () => {
+      this.getData();
+    });
+  };
+
+  faceSwitchHandler = value => {
+    this.setState(
+      {
+        isFace: value,
+      },
+      () => {
+        this.getData(true);
+      }
+    );
+  };
+
+  showLocusHandler = () => {
+    const { dispatch } = this.props;
+    const { imageFindtrack, threshold, isBodyMode } = this.state;
+
+    const that = this;
+    dispatch({
+      type: 'fusion/findTrack',
+      payload: {
+        id: JSON.stringify(imageFindtrack),
+        peopleType: isBodyMode,
+        threshold,
+      },
+      callback(res) {
+        if (res.status === 'success') {
+          that.setState({
+            locusVisible: true,
+          });
+        } else {
+          message.warning(res.exception);
+        }
+      },
+    });
+  };
+
+  hideLocusHandler = () => {
+    this.setState({
+      locusVisible: false,
+    });
+  };
+
+  hideLocusImgHandler = () => {
+    this.setState({
+      locusImgVisible: false,
+    });
+  };
+
+  getFaceImage = img => {
+    this.image = new Image();
+    this.image.src = `${this.url}${img}`;
+    this.image.addEventListener('load', this.handleLoad);
+  };
+
+  handleLoad = () => {
+    // after setState react-konva will update canvas and redraw the layer
+    // because "image" property is changed
+    this.setState({
+      trackFaceImage: this.image,
+      fillPattern: {
+        offsetX: this.image.width / 2,
+        offsetY: this.image.height / 2,
+        scaleX: 50 / this.image.width,
+        scaleY: 55 / this.image.height,
+      },
+    });
+    // if you keep same image object during source updates
+    // you will have to update layer manually:
+    // this.imageNode.getLayer().batchDraw();
+  };
+
+  circleImgHandler = inItem => {
+    this.setState({
+      locusImgVisible: true,
+      locusInfo: inItem,
+    });
+  };
+
+  findtrackImageHandler = outItem => {
+    const {
+      fusion: { trackListGps },
+    } = this.props;
+
+    let pointsFace = [];
+    if (trackListGps.list && trackListGps.list.in_door) {
+      trackListGps.list.in_door.forEach(item => {
+        pointsFace = [...pointsFace, ...item.points.filter(poItem => poItem.face_path !== '')];
+      });
+    }
+
+    if (pointsFace.length > 0 && pointsFace[0].face_path) {
+      this.getFaceImage(pointsFace[0].face_path);
+    } else {
+      this.setState({
+        trackFaceImage: null,
+      });
+    }
+
+    this.setState({
+      indoorimgData: {
+        ...outItem,
+      },
+      findtrackVisible: true,
+    });
+  };
+
+  hideFindtrackImageHandler = () => {
+    this.setState({
+      findtrackVisible: false,
+    });
+  };
+
+  searchVideoHandler = () => {
+    this.getData(true);
+  };
+
+  isOpenAttributeHandler = e => {
+    this.setState({
+      isBodyMode: e.target.value,
+    });
+  };
+
+  searchValuesHandler = value => {
+    this.setState(
+      {
+        searchValues: { ...value },
+      },
+      () => {
+        this.getData(true);
+      }
+    );
+  };
+
+  getBase64 = file =>
+    new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = error => reject(error);
+    });
+
+  paginationChange = page => {
+    const { pagination } = this.state;
+    pagination.current = page;
+
+    this.setState(
+      {
+        pagination,
+      },
+      this.getData()
+    );
+  };
+
+  handleCancel = () => this.setState({ sourceVisible: false });
+
+  checkImageWH = file =>
+    new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = e => {
+        const src = e.target.result;
+        const image = new Image();
+        image.onload = resolve;
+        image.onerror = reject;
+        image.src = src;
+      };
+      reader.readAsDataURL(file);
+    });
+
+  videoIdChange = value => {
+    this.setState({
+      videoId: value.filter(item => item.indexOf('D') !== 0),
+    });
+  };
+
+  sliderChange = value => {
+    this.setState({
+      threshold: value,
+    });
+  };
+
+  handleShowEnvironment = () => {
+    const { dispatch } = this.props;
+    dispatch({
+      type: 'fusion/simplequerylist',
+      payload: {},
+    });
+    this.setState({
+      environmentVisible: true,
+    });
+  };
+
+  handleHideEnvironment = () => {
+    this.startPoint = null;
+    this.setState({
+      environmentVisible: false,
+      polyPoints: null,
+    });
+  };
+
+  handleShowIndoor = () => {
+    this.setState({
+      indoorVisible: true,
+    });
+  };
+
+  handleMarkerClick = item => {
+    if (item.id.indexOf('I') === 0) {
+      this.setState({
+        indoorInfo: item,
+      });
+      this.handleShowIndoor();
+    }
+  };
+
+  handleHideIndoor = () => {
+    this.setState({
+      indoorVisible: false,
+    });
+  };
+
+  handleSelectVideo = () => {
+    const {
+      fusion: { listSimpleData },
+    } = this.props;
+    const ids = [];
+    listSimpleData.list.forEach(item => {
+      if (GeoUtils.isPointInRect({ lng: item.lng, lat: item.lat }, this.polygon.na)) {
+        if (item.vlist) {
+          item.vlist.forEach(vitem => {
+            ids.push(vitem.id);
+          });
+        } else {
+          ids.push(item.id);
+        }
+      }
+    });
+    this.setState({
+      videoId: ids,
+    });
+    this.handleHideEnvironment();
+  };
+
+  handleLocationError = e => {
+    // 定位失败事件
+    message.error(e.message);
+  };
+
+  // 视频源
+  videoData = () => {
+    const that = this;
+    const { dispatch } = this.props;
+
+    dispatch({
+      type: 'fusion/deptvideo',
+      payload: {},
+      callback(res) {
+        that.setState({
+          deptvideoData: res.list,
+        });
+      },
+    });
+  };
+
+  handleMapMounted = () => {
+    // 在地图加载完成后，即可通过window[name]取得对应地图实例
+    console.log(window.bmap);
+  };
+
+  handleMapMousedown = e => {
+    if (e.domEvent.button === 2) {
+      this.startPoint = e.point;
+      this.setState({
+        polyPoints: null,
+      });
+    }
+  };
+
+  handleMapMousemove = e => {
+    if (this.startPoint) {
+      const polyPoints = [];
+      polyPoints.push(this.startPoint);
+      polyPoints.push({ lng: e.point.lng, lat: this.startPoint.lat });
+      polyPoints.push(e.point);
+      polyPoints.push({ lng: this.startPoint.lng, lat: e.point.lat });
+      this.setState({
+        polyPoints,
+      });
+    }
+  };
+
+  handleMapMouseup = e => {
+    if (
+      this.startPoint &&
+      e.domEvent.button === 2 &&
+      (this.startPoint.lng !== e.point.lng || this.startPoint.lat !== e.point.lat)
+    ) {
+      const polyPoints = [];
+      polyPoints.push(this.startPoint);
+      polyPoints.push({ lng: e.point.lng, lat: this.startPoint.lat });
+      polyPoints.push(e.point);
+      polyPoints.push({ lng: this.startPoint.lng, lat: e.point.lat });
+      this.setState({
+        polyPoints,
+      });
+    }
+    this.startPoint = null;
+  };
+
+  // 原图坐标点
+  lineBodyAndFacePoint = points => {
+    const { imgScale } = this.state;
+    let bodyPoint = [];
+    if (points) {
+      bodyPoint = [
+        points[0] * imgScale,
+        points[1] * imgScale,
+
+        points[2] * imgScale,
+        points[1] * imgScale,
+
+        points[2] * imgScale,
+        points[3] * imgScale,
+
+        points[0] * imgScale,
+        points[3] * imgScale,
+      ];
+    }
+    return bodyPoint;
+  };
+
+  handleLoadImg = (size, isLoad) => {
+    let imgRealWidth = 0;
+    let imgWidth = 0;
+    let imgHeight = 0;
+    if (isLoad) {
+      const [width] = size.split(',');
+      imgRealWidth = width;
+      // imgRealHeight = size.split(",")[1];
+
+      imgWidth = this.imageNode.width;
+      imgHeight = this.imageNode.height;
+    } else {
+      const [width] = size.split(',');
+      imgRealWidth = width;
+      // imgRealHeight = size.split(",")[1];
+      imgWidth = this.imgNode.width;
+      imgHeight = this.imgNode.height;
+    }
+
+    this.setState({
+      stageWidth: imgWidth,
+      stageHeight: imgHeight,
+      imgScale: imgWidth / imgRealWidth,
+    });
+  };
+
+  uploadHandler = boxes => {
+    this.setState({
+      imgDatas: boxes,
+    });
+  };
+
+  removeSearchImg = path => {
+    const { dispatch } = this.props;
+    dispatch({
+      type: 'fusion/removeSearchimg',
+      payload: {
+        img: JSON.stringify([path]),
+      },
+    });
+  };
+
+  detectionPicHandler = (imgPath, callback) => {
+    const { dispatch } = this.props;
+    const that = this;
+    this.setState({
+      detectionPicLoading: true,
+      detectionPic: [],
+    });
+    dispatch({
+      type: 'fusion/detectionPicImg',
+      payload: {
+        img_path: imgPath,
+      },
+      callback(res) {
+        if (res.status === 'success') {
+          const sortDetectionPic = res.list.sort((a, b) => a[4] - b[4]);
+          that.setState(
+            {
+              detectionPicLoading: false,
+              detectionPic: sortDetectionPic,
+            },
+            () => {
+              if (callback) {
+                callback();
+              }
+            }
+          );
+        } else if (res.status === 'fail') {
+          message.error('检测失败!');
+          that.setState({
+            detectionPicLoading: false,
+          });
+        }
+      },
+    });
+  };
+
+  renderFooter = () => {
+    const { polyPoints } = this.state;
+    return [
+      <Tooltip key="tooltip">
+        <span style={{ float: 'left' }}>提示: 可以右键框选视频源.</span>
+      </Tooltip>,
+      <Button key="cancel" onClick={() => this.handleHideEnvironment()}>
+        Cancel
+      </Button>,
+      polyPoints && (
+        <Button key="submit" type="primary" onClick={() => this.handleSelectVideo()}>
+          OK
+        </Button>
+      ),
+    ];
+  };
+
+  renderIndoorFooter = () => {
+    const { polyPoints } = this.state;
+    return [
+      <Button key="cancel" onClick={() => this.handleHideIndoor()}>
+        Cancel
+      </Button>,
+      polyPoints && (
+        <Button key="submit" type="primary" onClick={() => this.handleSelectVideo()}>
+          OK
+        </Button>
+      ),
+    ];
+  };
+
+  getPolygonRef = ref => {
+    if (ref) {
+      this.polygon = ref.instance;
+    }
+  };
+
+  indoorTextEnter = () => {
+    document.getElementById('container').style.cursor = 'pointer';
+  };
+
+  indoorTextLeave = () => {
+    document.getElementById('container').style.cursor = 'default';
+  };
+
+  handleCorrectImage = checked => {
+    const { dispatch } = this.props;
+    const { imgContext } = this.state;
+    const newImgContext = { ...imgContext };
+    const that = this;
+    dispatch({
+      type: 'fusion/correctimage',
+      payload: {
+        id: imgContext.id,
+        correct: checked ? 1 : 0,
+      },
+      callback() {
+        message.success('操作成功');
+        newImgContext.correct = checked ? 1 : 0;
+        that.setState({
+          imgContext: newImgContext,
+        });
+      },
+    });
+  };
+
+  @Bind()
+  @Debounce(10)
+  reSizeCanvas() {
+    const {
+      indoorVisible,
+      indoorInfo,
+      findtrackVisible,
+      indoorimgData,
+      imageVisible,
+      imgContext,
+    } = this.state;
+    let imgRealWidth = 0;
+    let imgWidth = 0;
+    let imgHeight = 0;
+    if (indoorVisible) {
+      const [width] = indoorInfo.img_size.split(',');
+      imgRealWidth = width;
+      imgWidth = this.imageNode.width;
+      imgHeight = this.imageNode.height;
+    }
+    if (findtrackVisible) {
+      const [width] = indoorimgData.indoor_img_size.split(',');
+      imgRealWidth = width;
+
+      if (this.imgNode) {
+        imgWidth = this.imgNode.width;
+        imgHeight = this.imgNode.height;
+      }
+    }
+
+    if (imageVisible) {
+      if (this.imgNode) {
+        const [width] = imgContext.sourceImgSize.split(',');
+        imgRealWidth = width;
+        imgWidth = this.imgNode.width;
+        imgHeight = this.imgNode.height;
+      }
+    }
+
+    this.setState({
+      stageWidth: imgWidth,
+      stageHeight: imgHeight,
+      imgScale: imgWidth / imgRealWidth,
+    });
+  }
+
+  render() {
+    const {
+      pagination,
+      deptvideoData,
+      sourceImage,
+      sourceVisible,
+      imageVisible,
+      imgContext,
+      environmentVisible,
+      polyPoints,
+      videoId,
+      indoorVisible,
+      locusVisible,
+      findtrackVisible,
+      locusImgVisible,
+      locusInfo,
+      indoorInfo,
+      stageWidth,
+      stageHeight,
+      imgScale,
+      isBodyMode,
+      threshold,
+      indoorimgData,
+      imageFindtrack,
+      trackFaceImage,
+      fillPattern,
+      detectionPicLoading,
+      detectionPic,
+      imgDatas,
+      stage,
+    } = this.state;
+
+    const {
+      fusion: { listSimpleData, trackListGps, imagesList },
+      loading,
+      locusLoading,
+    } = this.props;
+
+    // let imageListDiv = null;
+    // if (imgDatas.length > 0) {
+    //   imageListDiv = imagesList.list.map(item => {
+    //     return (
+    //       <div key={`imgList${item.id}`}>
+    //         <Stage width={stageWidth} height={stageHeight} style={{ position: 'absolute' }}>
+    //           <Layer>
+    //             {imgContext.body && (
+    //               <Line points={this.lineBodyAndFacePoint(item.body)} stroke="red" closed />
+    //             )}
+    //             {imgContext.face && (
+    //               <Line points={this.lineBodyAndFacePoint(item.face)} stroke="yellow" closed />
+    //             )}
+    //           </Layer>
+    //         </Stage>
+    //         <img
+    //           alt=""
+    //           width="100%"
+    //           ref={node => {
+    //             this.imgNode = node;
+    //           }}
+    //           src={`/vaapi/${item.sourceimg}`}
+    //           onLoad={() => this.handleLoadImg(item.sourceImgSize)}
+    //         />
+    //       </div>
+    //     );
+    //   });
+    // }
+
+    const formItemLayout = {
+      labelCol: { span: 24 },
+      wrapperCol: { span: 24 },
+    };
+
+    const xxformItemLayout = {
+      labelCol: { span: 5 },
+      wrapperCol: { span: 15 },
+    };
+
+    const polygonDiv = polyPoints && (
+      <Polygon
+        strokeColor="blue"
+        strokeWeight={1}
+        strokeOpacity={0.01}
+        editing={false}
+        fillColor="green"
+        fillOpacity={0.3}
+        ref={this.getPolygonRef}
+      >
+        <Path>
+          {polyPoints.map((item, index) => (
+            <Point key={`point${index}`} lng={item.lng} lat={item.lat} />
+          ))}
+        </Path>
+      </Polygon>
+    );
+
+    const displayMethod = {
+      getData: this.getData,
+      isOpenAttributeHandler: this.isOpenAttributeHandler,
+      searchValuesHandler: this.searchValuesHandler,
+    };
+
+    const videoImgDiv =
+      false &&
+      indoorInfo.vlist.map(item => (
+        <URLImage
+          key={`urlImage${item.id}`}
+          src={videoImage}
+          x={item.x * imgScale}
+          y={item.y * imgScale}
+        />
+      ));
+
+    const videoTxtDiv =
+      false &&
+      indoorInfo.vlist.map(item => (
+        <Text
+          key={`text${item.id}`}
+          x={item.x * imgScale}
+          y={item.y * imgScale - 10}
+          text={item.name}
+          fill="blue"
+        />
+      ));
+
+    // let polyCount = 0;
+    const pointsData = [];
+
+    const canvasDiv =
+      trackListGps.list &&
+      trackListGps.list.in_door &&
+      trackListGps.list.in_door.map(inItem => {
+        if (inItem.vlist === indoorimgData.vlist) {
+          return inItem.points.map((poItem, poIndex) => {
+            pointsData.push(poItem.x * imgScale, poItem.y * imgScale);
+            return [
+              <Shape
+                key={`shape${poItem.start_time}`}
+                x={poItem.x * imgScale}
+                y={poItem.y * imgScale - 45}
+                sceneFunc={(context, shape) => {
+                  context.beginPath();
+                  context.arc(0, 0, 20, 0.75 * Math.PI, 0.25 * Math.PI);
+                  context.lineTo(0, 30);
+                  context.closePath();
+                  context.fillStrokeShape(shape);
+                }}
+                stroke="#5ea3e8"
+                strokeWidth={3}
+                fillPatternImage={trackFaceImage}
+                fillPatternRepeat="no-repeat"
+                // 设置水滴里面图片偏移量
+                fillPatternOffsetX={fillPattern.offsetX}
+                fillPatternOffsetY={fillPattern.offsetY}
+                fillPatternScaleX={fillPattern.scaleX}
+                fillPatternScaleY={fillPattern.scaleY}
+                onClick={() => this.circleImgHandler(poItem)}
+                onMouseEnter={this.indoorTextEnter}
+                onMouseLeave={this.indoorTextLeave}
+              />,
+              <Circle
+                key={`points${poItem.start_time}`}
+                stroke="#5ea3e8"
+                radius={4}
+                strokeWidth={3}
+                fill="#5ea3e8"
+                x={poItem.x * imgScale}
+                y={poItem.y * imgScale}
+              />,
+              <Text
+                key={`Texts${poItem.start_time}`}
+                fontSize={15}
+                text={poIndex + 1}
+                stroke="#5ea3e8"
+                x={poItem.x * imgScale - 3}
+                y={poItem.y * imgScale + 15}
+              />,
+            ];
+          });
+        }
+        return [];
+      });
+
+    const lineDiv = pointsData.map((item, index) => {
+      if (index % 2 === 0 && index !== pointsData.length - 2) {
+        const points = [item, pointsData[index + 1], pointsData[index + 2], pointsData[index + 3]];
+        return (
+          <Group
+            key={`line${item + index + 1},${pointsData[index + 1]}, ${pointsData[index + 2]}, ${
+              pointsData[index + 3]
+            }`}
+          >
+            <Line
+              points={points}
+              stroke="#5ea3e8"
+              lineJoin="miter"
+              lineCap="miter"
+              strokeWidth={3}
+              dash={[10, 1, 10, 1]}
+            />
+            <Arrow
+              points={[
+                item,
+                pointsData[index + 1],
+                (item + pointsData[index + 2]) / 2,
+                (pointsData[index + 1] + pointsData[index + 3]) / 2,
+              ]}
+              pointerLength={12}
+              pointerWidth={12}
+              fill="#5ea3e8"
+            />
+          </Group>
+        );
+      }
+      return null;
+    });
+
+    const marks = {
+      0.7: '0.7',
+      // 0.75: '0.75',
+      0.8: '0.8',
+      // 0.85: '0.85',
+      0.9: '0.9',
+      // 0.95: '0.95',
+      1: {
+        style: {
+          color: '#f50',
+        },
+        label: <strong>1</strong>,
+      },
+    };
+
+    return (
+      <PageHeaderWrapper>
+        <Card>
+          <div className={styles.searchMenu}>
+            <UploadAndSelectPeople
+              uploadHandler={this.uploadHandler}
+              imgRectsData={imgDatas}
+              removeSearchImg={this.removeSearchImg}
+              detectionPicHandler={this.detectionPicHandler}
+              detectionPic={detectionPic}
+              detectionPicLoading={detectionPicLoading}
+            />
+
+            <Form>
+              <Form.Item {...formItemLayout}>
+                <TreeSelect
+                  style={{ width: '80%' }}
+                  allowClear
+                  dropdownStyle={{ maxHeight: 400 }}
+                  treeData={deptvideoData}
+                  treeDataSimpleMode
+                  showSearch
+                  treeIcon={false}
+                  multiple
+                  treeCheckable
+                  value={videoId}
+                  onChange={this.videoIdChange}
+                  placeholder="请选择视频源"
+                  treeDefaultExpandAll
+                  treeNodeFilterProp="title"
+                />
+                <Button
+                  icon="environment"
+                  type="primary"
+                  style={{ marginLeft: 1 }}
+                  onClick={() => this.handleShowEnvironment()}
+                />
+              </Form.Item>
+              <Form.Item label="匹配度:" {...xxformItemLayout}>
+                <Slider
+                  min={0.7}
+                  max={1}
+                  step={0.05}
+                  marks={marks}
+                  defaultValue={threshold}
+                  onChange={this.sliderChange}
+                />
+              </Form.Item>
+
+              {/* <Row>
+                <Col span={6} style={{ minWidth: 85, marginTop: 2 }}>
+                  <Button icon="search" type="primary" onClick={this.searchVideoHandler}>
+                    查询
+                  </Button>
+                </Col>
+                <Col span={6} style={{ minWidth: 85, marginTop: 2 }}>
+                  <Button
+                    icon="environment"
+                    type="primary"
+                    style={{ marginLeft: 10 }}
+                    onClick={() => this.handleShowEnvironment()}
+                  >
+                    地图
+                  </Button>
+                </Col>
+              </Row> */}
+            </Form>
+          </div>
+
+          <div className={styles.imgContent}>
+            <DisplayMode
+              ref={node => {
+                this.displayMode = node;
+              }}
+              isBodyMode={isBodyMode}
+              {...displayMethod}
+            />
+
+            <Card
+              title="检索结果"
+              className={styles.retrievalResults}
+              extra={
+                <div>
+                  <Switch defaultChecked={false} onChange={this.faceSwitchHandler} />
+                  <span> 只显示有人脸的结果</span>
+                  <Button
+                    type="primary"
+                    style={{ marginLeft: 10 }}
+                    onClick={this.showLocusHandler}
+                    loading={locusLoading}
+                    disabled={imageFindtrack.length === 0}
+                  >
+                    轨迹
+                  </Button>
+                </div>
+              }
+            >
+              {imagesList.pagination &&
+                imagesList.pagination.list && (
+                  <Spin spinning={loading} delay={300}>
+                    <div className={classNames(styles.selectionImage, 'box-wrap')}>
+                      {imagesList.pagination.list.map(item => (
+                        <div
+                          key={`img${item.id}`}
+                          className={classNames(styles.imgCard, 'box-item')}
+                        >
+                          <div>
+                            {isBodyMode && (
+                              <div
+                                className={styles.faceImageContainer}
+                                onClick={() => this.showImageHandler(item)}
+                              >
+                                <FaceContainer
+                                  src={item.bodyimg ? this.url + item.bodyimg : bodyImage}
+                                  area={80}
+                                />
+                                <FaceContainer
+                                  src={item.headimg ? this.url + item.headimg : faceImage}
+                                  area={60}
+                                />
+                              </div>
+                            )}
+                            {!isBodyMode && (
+                              <div
+                                className={styles.faceImageContainer}
+                                onClick={() => this.showImageHandler(item)}
+                              >
+                                <FaceContainer
+                                  src={item.headimg ? this.url + item.headimg : faceImage}
+                                  area={60}
+                                />
+                                <FaceContainer
+                                  src={item.bodyimg ? this.url + item.bodyimg : bodyImage}
+                                  area={80}
+                                />
+                              </div>
+                            )}
+                            <div className={styles.faceInfoContainer}>
+                              <div style={{ opacity: 0, height: 0 }}>{item.id}-</div>
+                              {item.score && (
+                                <Tag
+                                  style={{
+                                    marginBottom: 5,
+                                    display: 'inline-block',
+                                  }}
+                                  color="blue"
+                                >
+                                  {Number(item.score * 100).toFixed(1)}%
+                                </Tag>
+                              )}
+                              <Tag color="green">{item.video_name}</Tag>
+                              <Tag color="cyan" style={{ display: 'inline-block' }}>
+                                {item.time}
+                              </Tag>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+
+                    <Pagination
+                      showSizeChanger
+                      showQuickJumper
+                      pageSizeOptions={['20', '40', '60', '80', '100']}
+                      current={pagination.current}
+                      total={pagination.total}
+                      onChange={this.paginationChange}
+                      onShowSizeChange={this.paginationSizeChange}
+                      style={{ float: 'right', marginTop: 15 }}
+                      showTotal={(total, range) => `显示 ${range[0]} - ${range[1]}，共 ${total} 条`}
+                      pageSize={pagination.pageSize}
+                    />
+                  </Spin>
+                )}
+              {loading === undefined && <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} />}
+            </Card>
+          </div>
+        </Card>
+
+        {sourceVisible && (
+          <Modal
+            className={styles.preview}
+            visible={sourceVisible}
+            footer={null}
+            onCancel={this.handleCancel}
+            closable={false}
+            width={1000}
+          >
+            <img alt="" style={{ width: '100%' }} src={sourceImage} />
+          </Modal>
+        )}
+
+        {imageVisible && (
+          <Modal
+            width="90%"
+            className={styles.preview}
+            visible={imageVisible}
+            footer={null}
+            onCancel={this.hideImageHandler}
+            closable={false}
+          >
+            <div className={styles.leftBodyFace}>
+              <div style={{ background: '#16A8FF', margin: '0 1px 10px 0', padding: 5 }}>
+                <div style={{ marginBottom: 10 }}>
+                  <div style={{ display: 'inline-block', width: '48%', marginRight: 5 }}>
+                    {imgContext.search_img && (
+                      <div>
+                        <Tag color="blue" className={styles.leftBodyTag}>
+                          框选图片
+                        </Tag>
+                        <img
+                          alt=""
+                          className={styles.searchImg}
+                          src={this.url + imgContext.search_img}
+                        />
+                      </div>
+                    )}
+                    <div>
+                      <Tag color="blue" className={styles.leftBodyTag}>
+                        {isBodyMode ? '人脸结果' : '人体结果'}
+                      </Tag>
+                      {isBodyMode && (
+                        <img
+                          alt=""
+                          className={styles.faceImg}
+                          src={imgContext.faceimg ? this.url + imgContext.faceimg : faceImage}
+                        />
+                      )}
+                      {!isBodyMode && (
+                        <img
+                          alt=""
+                          className={styles.bodyimg}
+                          src={imgContext.bodyimg ? this.url + imgContext.bodyimg : bodyImage}
+                        />
+                      )}
+                    </div>
+                  </div>
+                  <div className={styles.tagDiv}>
+                    <Tag color="blue" className={styles.leftBodyTag}>
+                      {isBodyMode ? '人体结果' : '人脸结果'}
+                    </Tag>
+                    {isBodyMode && (
+                      <img
+                        alt=""
+                        className={styles.bodyimg}
+                        src={imgContext.bodyimg ? this.url + imgContext.bodyimg : bodyImage}
+                      />
+                    )}
+                    {!isBodyMode && (
+                      <img
+                        alt=""
+                        className={styles.faceImg}
+                        src={imgContext.faceimg ? this.url + imgContext.faceimg : faceImage}
+                      />
+                    )}
+                  </div>
+                </div>
+                {imgContext.score && (
+                  <Tag
+                    style={{ marginBottom: 5, textAlign: 'center', display: 'block', fontSize: 16 }}
+                    color="blue"
+                  >
+                    <span>{Number(imgContext.score * 100).toFixed(1)}%</span>
+                  </Tag>
+                )}
+              </div>
+              <Tag
+                style={{
+                  position: 'absolute',
+                  bottom: 40,
+                  marginTop: 5,
+                  marginBottom: 5,
+                  fontSize: 16,
+                }}
+                color="cyan"
+              >
+                {imgContext.video_name}
+              </Tag>
+              <Tag
+                style={{
+                  position: 'absolute',
+                  bottom: 10,
+                  marginTop: 5,
+                  marginBottom: 5,
+                  fontSize: 16,
+                }}
+                color="cyan"
+              >
+                {imgContext.time}
+              </Tag>
+              {imgContext.attribute.map(item => (
+                <Tag style={{ marginTop: 5, marginBottom: 5, fontSize: 15 }} color="green">
+                  {this.getAttrInfo(item)}
+                </Tag>
+              ))}
+              <div>
+                <Switch
+                  onClick={checked => this.handleCorrectImage(checked)}
+                  checked={imgContext.correct === 1}
+                  checkedChildren={
+                    <span>
+                      识别正确&nbsp;
+                      <Icon type="check" />
+                    </span>
+                  }
+                  unCheckedChildren={
+                    <span>
+                      识别错误&nbsp;
+                      <Icon type="close" />
+                    </span>
+                  }
+                />
+              </div>
+            </div>
+
+            <div className={styles.rightBodyFace}>
+              {/* {imgDatas.length === 0 && (
+                <div> */}
+              <Stage
+                ref={node => {
+                  // this.stage = node;
+                  this.setState({
+                    stage: node,
+                  });
+                }}
+                width={stageWidth}
+                height={stageHeight}
+                style={{ position: 'absolute' }}
+              >
+                <Layer>
+                  {imgContext.body && (
+                    <Line points={this.lineBodyAndFacePoint(imgContext.body)} stroke="red" closed />
+                  )}
+                  {imgContext.face && (
+                    <Line
+                      points={this.lineBodyAndFacePoint(imgContext.face)}
+                      stroke="yellow"
+                      closed
+                    />
+                  )}
+                </Layer>
+                <Portal>
+                  <RightClickMenu
+                    target={stage}
+                    list={[
+                      {
+                        id: 'download',
+                        icon: 'download',
+                        title: '下载图片',
+                      },
+                      {
+                        id: 'open',
+                        icon: 'file-image',
+                        title: '打开图片',
+                      },
+                      {
+                        id: 'copy',
+                        icon: 'copy',
+                        title: '复制图片',
+                      },
+                    ]}
+                    handleMenuItemClick={({ key }) => this.menuItemMethod[key]()}
+                  />
+                </Portal>
+              </Stage>
+              <img
+                alt=""
+                width="100%"
+                ref={node => {
+                  this.imgNode = node;
+                }}
+                src={`/vaapi/${imgContext.sourceimg}`}
+                onLoad={() => this.handleLoadImg(imgContext.sourceImgSize)}
+              />
+              {/* </div>
+              )} */}
+
+              {/* {imgDatas.length > 0 && imageListDiv} */}
+            </div>
+          </Modal>
+        )}
+
+        {environmentVisible && (
+          <Modal
+            title="地图"
+            width={1000}
+            className={styles.address}
+            visible={environmentVisible}
+            onCancel={() => this.handleHideEnvironment()}
+            footer={this.renderFooter()}
+          >
+            <div style={{ height: 600 }}>
+              <Map
+                name="bmap"
+                ak="eBGR7XzaPhB5UbYARl3E7ksdkMdgrCw7"
+                mounted={this.handleMapMounted}
+                scrollWheelZoom
+                zoom={14}
+                doubleClickZoom={false}
+                dragging
+              >
+                {polygonDiv}
+                <Events
+                  mousedown={this.handleMapMousedown}
+                  mousemove={this.handleMapMousemove}
+                  mouseup={this.handleMapMouseup}
+                />
+                <Point
+                  name="center"
+                  lng={listSimpleData.list.length > 0 ? listSimpleData.list[0].lng : 120.0}
+                  lat={listSimpleData.list.length > 0 ? listSimpleData.list[0].lat : 31.0}
+                />
+                <Navigation />
+                {listSimpleData.list.map(item => (
+                  <Marker key={`center${item.id}`}>
+                    <Point lng={item.lng} lat={item.lat} />
+                    <Marker.Icon imageUrl={item.id.indexOf('I') === 0 ? indoorImage : videoImage}>
+                      <Size width="30" height={item.id.indexOf('I') !== 0 ? 30 : 50} />
+                    </Marker.Icon>
+                    <Events click={() => this.handleMarkerClick(item)} />
+                    <Label style={{ border: '1px solid #1890FF' }}>
+                      <Size name="offset" width="20" height="-30" />
+                      <Content>
+                        {item.name}
+                        {item.vlist ? `(${item.vlist.length})` : ''}
+                      </Content>
+                    </Label>
+                  </Marker>
+                ))}
+              </Map>
+            </div>
+          </Modal>
+        )}
+        {indoorVisible && (
+          <Modal
+            title={`平面图(${indoorInfo.name})`}
+            width="90%"
+            className={styles.address}
+            visible={indoorVisible}
+            closable={false}
+            onCancel={() => this.handleHideIndoor()}
+            footer={this.renderIndoorFooter()}
+          >
+            <div>
+              <Stage width={stageWidth} height={stageHeight} style={{ position: 'absolute' }}>
+                <Layer>
+                  {videoImgDiv}
+                  {videoTxtDiv}
+                </Layer>
+              </Stage>
+              <img
+                width="100%"
+                alt="室内图"
+                ref={node => {
+                  this.imageNode = node;
+                }}
+                src={`/vaapi/${indoorInfo.img_path}`}
+                onLoad={() => this.handleLoadImg(indoorInfo.img_size, true)}
+              />
+            </div>
+          </Modal>
+        )}
+        {locusVisible && (
+          <Modal
+            width="70%"
+            title="轨迹"
+            className={styles.address}
+            visible={locusVisible}
+            onCancel={this.hideLocusHandler}
+            footer={null}
+          >
+            {trackListGps.list &&
+            trackListGps.list.out_door &&
+            trackListGps.list.out_door.length > 0 ? (
+              <div style={{ height: 600 }}>
+                <Map ak="eBGR7XzaPhB5UbYARl3E7ksdkMdgrCw7" zoom={14} scrollWheelZoom>
+                  <Point
+                    name="center"
+                    lng={trackListGps.list.out_door[0].lng}
+                    lat={trackListGps.list.out_door[0].lat}
+                  />
+                  <Polyline
+                    strokeColor={polylinePointsColor[0]}
+                    strokeWeight={2}
+                    strokeOpacity={0.8}
+                    strokeStyle="dashed"
+                  >
+                    <Path>
+                      {trackListGps.list.out_door.map((outItem, outIndex) => (
+                        <Point
+                          key={`indo${outIndex}`}
+                          name="position"
+                          lng={outItem.lng}
+                          lat={outItem.lat}
+                        />
+                      ))}
+                    </Path>
+                  </Polyline>
+                  {trackListGps.list.out_door.map((outItem, outIndex) => (
+                    <div key={`label_icon${outIndex}`}>
+                      <Label style={{ border: '1px solid #1890FF' }}>
+                        <Point name="position" lng={outItem.lng} lat={outItem.lat} />
+                        <Size name="offset" width="10" height="-30" />
+                        <Content>{outItem.indoor_name}</Content>
+                      </Label>
+                      <Marker>
+                        <Point lng={outItem.lng} lat={outItem.lat} />
+                        <Marker.Icon imageUrl={outItem.vlist ? indoorImage : videoImage}>
+                          <Size width="50" height="50" />
+                        </Marker.Icon>
+                        {outItem.vlist && (
+                          <Events click={() => this.findtrackImageHandler(outItem)} />
+                        )}
+                      </Marker>
+                    </div>
+                  ))}
+                </Map>
+              </div>
+            ) : (
+              <Empty description="暂无轨迹!" />
+            )}
+          </Modal>
+        )}
+        {findtrackVisible && (
+          <Modal
+            title="室内图"
+            width="90%"
+            visible={findtrackVisible}
+            onCancel={this.hideFindtrackImageHandler}
+            footer={null}
+          >
+            <div id="container">
+              <Stage width={stageWidth} height={stageHeight} style={{ position: 'absolute' }}>
+                <Layer>
+                  {lineDiv}
+                  {canvasDiv}
+                </Layer>
+              </Stage>
+            </div>
+            <img
+              alt=""
+              width="100%"
+              ref={node => {
+                this.imgNode = node;
+              }}
+              src={`/vaapi/${indoorimgData.indoor_img}`}
+              onLoad={() => this.handleLoadImg(indoorimgData.indoor_img_size)}
+            />
+          </Modal>
+        )}
+        {locusImgVisible && (
+          <Modal
+            title="轨迹图片"
+            className={styles.preview}
+            visible={locusImgVisible}
+            onCancel={this.hideLocusImgHandler}
+            footer={null}
+          >
+            <Tag style={{ marginTop: 5, marginBottom: 5, fontSize: 16 }} color="green">
+              {locusInfo.v_name}
+            </Tag>
+            <Tag style={{ marginTop: 5, marginBottom: 5, fontSize: 16 }} color="cyan">
+              {locusInfo.start_time === locusInfo.end_time
+                ? locusInfo.start_time
+                : `${locusInfo.start_time} - ${locusInfo.end_time}`}
+            </Tag>
+            <Zmage src={`/vaapi/${locusInfo.body_path}`} alt="轨迹图片预览" width="100%" />
+          </Modal>
+        )}
+      </PageHeaderWrapper>
+    );
+  }
+}
+
+export default Fusion;
